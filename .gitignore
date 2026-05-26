@@ -1,0 +1,39 @@
+# Virtual environments
+.venv/
+.venv_py312_clean/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Model checkpoints and large binaries
+*.pt
+*.pth
+*.bin
+*.npy
+*.npz
+
+# Experiment run outputs (logs, checkpoints, results from running the code)
+experiments/dbt_dino_runs/
+experiments/dino_probe_bundles/
+experiments/mil_prep_bundles/
+experiments/toy_dino_cifar10/
+experiments/dbt_cross_slice_transformer/runs/
+
+# CIFAR-10 downloaded data
+cifar-10-batches-py/
+cifar-10-python.tar.gz
+
+# IDE / OS
+.idea/
+.vscode/
+.cursor/
+.DS_Store
+Thumbs.db

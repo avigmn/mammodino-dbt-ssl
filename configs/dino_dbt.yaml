@@ -1,0 +1,69 @@
+seed: 42
+
+data:
+  repo_root: ../dbt_simclr_project
+  data_config_path: configs/data.yaml
+
+dataset:
+  resize_height: 224
+  resize_width: 224
+  normalize: true
+  use_processed_cache: true
+  volume_pair_mode: off
+  stochastic_val_views: false
+  max_bad_sample_retries: 32
+  teacher_rrc_scale_min: 0.85
+  teacher_rrc_scale_max: 1.0
+  teacher_horizontal_flip_p: 0.5
+  student_rrc_scale_min: 0.2
+  student_rrc_scale_max: 1.0
+  student_horizontal_flip_p: 0.5
+  student_color_jitter_p: 0.8
+  student_color_jitter_brightness: 0.2
+  student_color_jitter_contrast: 0.2
+  student_gaussian_blur_p: 0.5
+  student_gaussian_blur_kernel: 23
+  tissue_percentile: 80.0
+  tissue_mask_cleanup: true
+  tissue_crop_bias_prob: 0.6
+  tissue_crop_pad_frac: 0.08
+
+model:
+  image_size: 224
+  patch_size: 16
+  num_prototypes: 512
+  num_patch_prototypes: 512
+  embed_dim: 192
+  depth: 4
+  num_heads: 3
+  head_hidden_dim: 512
+  head_bottleneck_dim: 256
+
+train:
+  epochs: 100
+  batch_size: 16
+  grad_accum_steps: 4
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  teacher_momentum: 0.996
+  center_momentum: 0.9
+  student_temp: 0.1
+  teacher_temp: 0.04
+  w_ibot: 0.1
+  ibot_mask_ratio: 0.35
+  ibot_center_momentum: 0.9
+  ibot_student_temp: 0.1
+  ibot_teacher_temp: 0.04
+  w_cross_slice: 0.0
+  amp: true
+  num_workers: 8
+  pin_memory: true
+  max_train_steps: 0
+  max_val_steps: 0
+  early_stopping:
+    patience: 8
+    min_delta: 1.0e-4
+
+output:
+  run_name: dino_dbt_run
+  auto_append_timestamp: true

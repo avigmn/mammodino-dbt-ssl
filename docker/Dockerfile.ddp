@@ -1,0 +1,49 @@
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-venv \
+    python3-pip \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV VENV_PATH=/opt/venv
+RUN python3 -m venv "${VENV_PATH}"
+ENV PATH="${VENV_PATH}/bin:${PATH}"
+
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# Pin a known-good CUDA 12.1 torch stack for multi-GPU in-container runs.
+RUN python -m pip install \
+    torch==2.5.1+cu121 \
+    torchvision==0.20.1+cu121 \
+    torchaudio==2.5.1+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# Runtime dependencies used by training scripts.
+RUN python -m pip install \
+    numpy \
+    pillow \
+    tqdm \
+    matplotlib \
+    scikit-learn \
+    pyyaml \
+    pandas \
+    pyarrow
+
+WORKDIR /mnt/md0/Liron/mammodino_ssl_project
+
+# Keep NCCL conservative for mixed server environments.
+ENV NCCL_DEBUG=INFO
+ENV NCCL_IB_DISABLE=1
+ENV NCCL_P2P_DISABLE=0
+ENV NCCL_NET=Socket
+ENV NCCL_SOCKET_IFNAME=^lo,docker0
+ENV NCCL_NVLS_ENABLE=0
+
+# Ensure repo sources are importable even without editable install.
+ENV PYTHONPATH=/mnt/md0/Liron/mammodino_ssl_project/src:/mnt/md0/Liron/dbt_simclr_project/src
+
+CMD ["/bin/bash"]

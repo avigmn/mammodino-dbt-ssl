@@ -1,0 +1,57 @@
+seed: 42
+
+data:
+  repo_root: ../dbt_simclr_project
+  data_config_path: configs/data.yaml
+
+dataset:
+  resize_height: 224
+  resize_width: 224
+  normalize: true
+  use_processed_cache: true
+  volume_pair_mode: off
+  stochastic_val_views: false
+  max_bad_sample_retries: 32
+  teacher_rrc_scale_min: 0.85
+  teacher_rrc_scale_max: 1.0
+  teacher_horizontal_flip_p: 0.5
+  student_rrc_scale_min: 0.2
+  student_rrc_scale_max: 1.0
+  student_horizontal_flip_p: 0.5
+  student_color_jitter_p: 0.8
+  student_color_jitter_brightness: 0.2
+  student_color_jitter_contrast: 0.2
+  student_gaussian_blur_p: 0.5
+  student_gaussian_blur_kernel: 23
+
+model:
+  image_size: 224
+  num_prototypes: 512
+  embed_dim: 192
+  depth: 4
+  num_heads: 3
+  head_hidden_dim: 512
+  head_bottleneck_dim: 256
+
+train:
+  epochs: 1
+  batch_size: 4
+  grad_accum_steps: 1
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  teacher_momentum: 0.996
+  center_momentum: 0.9
+  student_temp: 0.1
+  teacher_temp: 0.04
+  amp: true
+  num_workers: 2
+  pin_memory: true
+  max_train_steps: 4
+  max_val_steps: 2
+  early_stopping:
+    patience: 0
+    min_delta: 0.0
+
+output:
+  run_name: dino_dbt_smoke
+  auto_append_timestamp: true

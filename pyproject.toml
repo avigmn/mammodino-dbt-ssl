@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mammodino-ssl"
+version = "0.1.0"
+description = "MammoDINO-style SSL (toy CIFAR-10 first; DBT adapter later)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+train = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "tqdm>=4.66",
+    "matplotlib>=3.8",
+    "scikit-learn>=1.4",
+]
+dev = [
+    "pytest>=7.0",
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "tqdm>=4.66",
+    "matplotlib>=3.8",
+    "scikit-learn>=1.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
