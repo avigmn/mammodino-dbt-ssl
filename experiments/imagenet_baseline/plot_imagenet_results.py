@@ -19,6 +19,20 @@ def main() -> None:
     test = data.get("test", {})
     auc = test.get("auroc", float("nan"))
 
+    # MIL training loss curve
+    history = data.get("mil_train_loss_history", [])
+    if history:
+        epochs = list(range(1, len(history) + 1))
+        plt.figure(figsize=(8, 5))
+        plt.plot(epochs, history, marker="o", markersize=3, color="darkorange", label="MIL Train Loss")
+        plt.xlabel("Epoch"); plt.ylabel("Loss")
+        plt.title("MIL Attention Pool Training — ImageNet Baseline")
+        plt.legend(); plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(OUT_DIR / "mil_training_curves.png", dpi=150)
+        plt.close()
+        print("mil_training_curves.png saved")
+
     # ROC curve
     fpr = test.get("fpr")
     tpr = test.get("tpr")

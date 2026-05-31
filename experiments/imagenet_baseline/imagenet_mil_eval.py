@@ -188,7 +188,7 @@ def _train_mil(
     lr: float,
     batch_size: int,
     seed: int,
-) -> AttentionPatientClassifier:
+) -> tuple[AttentionPatientClassifier, list[float]]:
     torch.manual_seed(seed)
     dim = mats[0].shape[1]
     model = AttentionPatientClassifier(dim).to(device)
@@ -199,14 +199,20 @@ def _train_mil(
     g.manual_seed(seed)
     loader = DataLoader(ds, batch_size=batch_size, shuffle=True,
                         collate_fn=_collate_patients, generator=g)
+    history: list[float] = []
     model.train()
     for _ in tqdm(range(epochs), desc="MIL training", dynamic_ncols=True):
+        running, n = 0.0, 0
         for padded, mask, y in loader:
             padded, mask, y = padded.to(device), mask.to(device), y.to(device)
             opt.zero_grad(set_to_none=True)
-            crit(model(padded, mask), y).backward()
+            loss = crit(model(padded, mask), y)
+            loss.backward()
             opt.step()
-    return model
+            running += float(loss.detach().cpu())
+            n += 1
+        history.append(running / max(1, n))
+    return model, history
 
 
 @torch.no_grad()
@@ -345,9 +351,9 @@ def main() -> None:
         _, te_mats, te_y = _group_by_patient(Xte, yte, pid_te)
 
     # --- train MIL head ---
-    mil = _train_mil(tr_mats, tr_y, device,
-                     epochs=args.attn_epochs, lr=args.attn_lr,
-                     batch_size=args.attn_batch_patients, seed=args.seed)
+    mil, mil_history = _train_mil(tr_mats, tr_y, device,
+                                  epochs=args.attn_epochs, lr=args.attn_lr,
+                                  batch_size=args.attn_batch_patients, seed=args.seed)
 
     # --- evaluate ---
     p_val = _eval_mil(mil, va_mats, device, args.attn_batch_patients, "MIL infer (val)")
@@ -365,6 +371,7 @@ def main() -> None:
         "n_val_patients": int(len(va_y)),
         "attn_epochs": args.attn_epochs,
         "attn_lr": args.attn_lr,
+        "mil_train_loss_history": mil_history,
         "val": val_metrics,
     }
 
