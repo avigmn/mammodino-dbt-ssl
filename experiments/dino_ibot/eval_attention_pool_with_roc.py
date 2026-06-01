@@ -21,9 +21,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_MAMMODINO_SRC = Path("/mnt/md0/Liron/mammodino_ssl_project/src")
 _DBT_SRC = Path("/mnt/md0/Liron/dbt_simclr_project/src")
-for _p in (_REPO_ROOT / "src", _DBT_SRC):
+for _p in (_MAMMODINO_SRC, _DBT_SRC):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -225,7 +225,8 @@ def main():
     ).to(device)
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
     state = ckpt["model_state"]
-    state = {k.replace("student_backbone.module.", "student_backbone."): v for k, v in state.items()}
+    # strip DDP .module. prefix from all submodules
+    state = {k.replace(".module.", "."): v for k, v in state.items()}
     ssl.load_state_dict(state, strict=True)
     backbone = ssl.student_backbone
 
