@@ -1,0 +1,6 @@
+Model comparison summary
+Generated: 2026-06-08T13:36:44.600494+00:00
+Total rows: 18
+
+Best test AUROC (slice): DINO-full / linear_probe = 0.6360
+Best test AUROC (patient): DINO-full / patient_attention_mil = 0.6978
