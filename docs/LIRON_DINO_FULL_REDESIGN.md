@@ -205,6 +205,28 @@ DBT has 4 views per patient (L-CC, L-MLO, R-CC, R-MLO) grouped by side (L/R). `m
 - Variants: `stage10_e2e_bce_focal` → `…_focal_slice_mil` → `…_focal_slice_mil_hard` (best)
 - 2.6M trainable params (backbone 1.96M + hierarchy 0.65M), ~80 epochs, early-stop patience 12, AMP
 
+## Empirical representation analysis (the "why" behind the arc)
+
+From `dino_full_v1` frozen **teacher** embeddings on the val split (10,477 slices /
+285 patients) — `representation_analysis/` and `representation_attribution_analysis/`:
+
+**What the embedding does NOT encode well — the cancer label:**
+- silhouette (cosine) = **0.007**, (euclidean) 0.005 → essentially no clustering by malignancy
+- between/within class distance ratio = **1.009** (cosine) / 1.006 (euclidean) → pos and neg are ~equally far apart as within-class
+- PCA: PC1 18% variance, top-3 cumulative 43%
+
+**What the embedding DOES strongly encode (attribution analysis):**
+- **Patient identity** — cosine diff/same-group ratio **2.10**; **top-1 same-patient retrieval 99.1%** → slices of the same patient cluster very tightly
+- **Slice depth (z-position)** — depth-distance Spearman **0.823** → anatomically adjacent slices are near-neighbors (learned z-continuity)
+- **Laterality (L/R)** — silhouette (cosine) 0.19 → moderately encoded
+
+**Why this matters (drives the whole pipeline design):** the SSL space self-organizes
+by *patient* and *slice depth*, **not** by cancer label. That is exactly why
+(a) frozen linear/k-NN heads plateau (the malignancy signal is weak in raw features),
+(b) the **Stage-7 hierarchy exploits** the depth/anatomy structure it *did* learn
+(continuity + view/side), and (c) **end-to-end fine-tuning (Stage 10)** is required to
+reshape the space toward the cancer signal — lifting val AUROC to 0.77.
+
 ## Artifacts (server)
 
 - Scripts: `scripts/head_evaluation/stage{0..10}_*.py` (+ `stage_*_commands.sh`)
