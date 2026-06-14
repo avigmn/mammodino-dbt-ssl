@@ -151,16 +151,34 @@ Recipe (Stage 10, `stage10_imbalance_aware_pathology_dino_mil.py`):
 - Optional slice **continuity** term (≈0.01)
 - ~80 epochs max, early stopping patience 12; params: backbone 1.96M + hierarchy 0.65M = 2.6M
 
-## Stage progression (best AUROC per stage)
+## Stage-by-stage pipeline (what each stage does + best AUROC)
 
-| Stage | Approach | Backbone | Best AUROC |
-|---|---|---|---|
-| 1–3 | slice heads / pooling / gated MIL | frozen | ~0.63–0.72 (test) |
-| 5 / 5b | end-to-end MIL (gated / guided sampling) | fine-tuned | ~0.71 (test) |
-| 7 | hierarchical view+side attention MIL | frozen | **0.7615 (test)** |
-| 8 | patient SupCon representation learning | frozen | ~0.755 (test) |
-| 9 | selective-KD slice adapter | frozen | ~0.748 (val) |
-| **10** | **e2e focal slice-MIL + hard mining** | **fine-tuned** | **0.7702 (val) / ~0.75–0.76 (test)** |
+All stages consume the **frozen Stage-0 DINO-full embeddings** unless marked "e2e
+fine-tuned" (Stages 5/5b/10, which unfreeze the backbone). Threshold tuned on val,
+applied to test. Scripts: `scripts/head_evaluation/stage{N}_*.py`; outputs:
+`report_outputs/head_evaluation/stage_{N}_*/`.
+
+| Stage | What it does | Backbone | Val | Test |
+|---|---|---|---|---|
+| 0 | Extract frozen teacher CLS embeddings (192-d) + metadata per split — single source of truth for all later stages | frozen | — | — |
+| 1 | Slice-level heads (logreg, SVM, RF, MLP, XGB) on slice embeddings; weak (inherited) slice labels — baseline | frozen | 0.623 | 0.622 |
+| 2 | Patient aggregation: prob pooling (mean/max/median/top-k/percentile/noisy-or) + embedding pooling (mean/max/concat → classifier) | frozen | 0.739 | 0.720 |
+| 3 | MIL heads (attention, gated-attention, top-k, GRU, transformer) over slice-embedding bags | frozen | 0.713 | 0.714 |
+| 3b | Imbalance-aware retraining of patient heads (class-weight, oversample, cost-sensitive, focal) | frozen | — | ~0.72 |
+| 4 | Interpretability for selected heads (attention/instance scores) — no new training | frozen | — | — |
+| 5 | End-to-end MIL fine-tuning: DINO ViT-Tiny + gated-attention MIL, conservative backbone unfreeze | **e2e** | 0.716 | 0.721 |
+| 5b | End-to-end MIL with guided sampling | **e2e** | 0.716 | 0.721 |
+| 6 | Teacher-guided pseudo-slice supervision | frozen | — | ~0.71 |
+| 7 | **Hierarchical side/view attention MIL** (slice→view→side→patient) | frozen | 0.752 | **0.7615** ← best test |
+| 8 | Patient-level supervised contrastive (SupCon) representation learning | frozen | 0.755 | 0.755 |
+| 9 | SelectiveKD-inspired pathology-aware slice adapter (residual adapter + KD) | frozen | 0.748 | 0.746 |
+| **10** | **Imbalance-aware pathology DINO-MIL, end-to-end**: focal BCE + hard-example mining + top-k slice-MIL + Stage-7 hierarchy | **e2e** | **0.7702** | **0.7586** |
+| 10c | Stage-10 variant with view-OR aggregation | **e2e** | 0.756 | 0.754 |
+
+**Reading the arc:** frozen heads plateau ~0.72–0.75 (Stages 1–9); the two levers
+that helped most were (a) the **Stage-7 hierarchy** (slice→view→side→patient
+attention, best *frozen* test 0.7615) and (b) **end-to-end fine-tuning** in Stage
+10 (best val 0.7702). Stage 10 combines both + imbalance-aware training.
 
 ## Artifacts (server)
 
