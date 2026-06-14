@@ -180,6 +180,31 @@ that helped most were (a) the **Stage-7 hierarchy** (slice→view→side→patie
 attention, best *frozen* test 0.7615) and (b) **end-to-end fine-tuning** in Stage
 10 (best val 0.7702). Stage 10 combines both + imbalance-aware training.
 
+## Technical deep-dive
+
+### DINO-full SSL core (the pretraining)
+- `train/dino_multicrop_loss.py::DINOLoss` is a **direct port of Facebook DINO's loss**: CE between centered+sharpened **teacher** distributions (global crops only) and **student** log-distributions (all crops), summed over every (teacher-global × student) pair **except same-view**, with an EMA `center` buffer (DDP-reduced) and **teacher-temperature warmup**.
+- `models/multicrop_wrapper.py::MultiCropWrapper` groups crops by resolution, runs **one backbone pass per resolution group**, then the head on concatenated CLS tokens (the efficient DINO trick).
+- `models/dino_head.py`: MLP → **L2-normalized bottleneck** → **weight-normalized prototype layer** (K=4096). `train/schedules.py`: cosine LR+warmup, cosine WD, teacher-momentum→1.0, teacher-temp warmup.
+- Audit (`docs/DINO_IMPLEMENTATION_AUDIT.md`) confirms the old project's distillation skeleton was correct but missing multi-crop, the faithful head, schedules, k-NN, and attention extraction — exactly the gaps this fork closes.
+
+### Stage 7 — hierarchical anatomy-aware MIL (`src/mammodino_ssl/stage7/`)
+DBT has 4 views per patient (L-CC, L-MLO, R-CC, R-MLO) grouped by side (L/R). `model.py::HierarchicalViewSideMIL` aggregates in that anatomical order:
+1. **slice → view**: gated `AttentionMIL` over a view's z-ordered slices → view representation + view score + per-slice attention
+2. **view → side**: gated `AttentionMIL` over the (≤2) views of each side, with optional **continuity** features (z-adjacency norm)
+3. **side → patient**: combines L/R side reps with optional **side-agreement** features (do L and R views agree?), **missing-view** indicators, and patient features → patient logit
+- This anatomical hierarchy is what lifted the *frozen* ceiling from ~0.72 (flat MIL) to **0.7615 test**.
+
+### Stage 10 — imbalance-aware end-to-end DINO-MIL (the 0.77 run)
+`scripts/head_evaluation/stage10_imbalance_aware_pathology_dino_mil.py`, exact hyperparameters:
+- **End-to-end fine-tuning**: backbone_lr **2e-6** (tiny, to gently adapt the encoder) + head_lr **1e-4** (Stage-7 hierarchy head)
+- **Patient loss**: `focal_bce`, **focal γ=2.0**, **α_pos=0.55 / α_neg=0.45** (imbalance-aware)
+- **Top-k slice MIL**: `topk_slices=8` auxiliary slice objective
+- **Hard-example weighting**: hard pos/neg mined from train+val only (test excluded); ~134 train + 42 val hard cases
+- Optional **continuity** (λ≈0.01) and **view-OR** (Stage 10c) terms
+- Variants: `stage10_e2e_bce_focal` → `…_focal_slice_mil` → `…_focal_slice_mil_hard` (best)
+- 2.6M trainable params (backbone 1.96M + hierarchy 0.65M), ~80 epochs, early-stop patience 12, AMP
+
 ## Artifacts (server)
 
 - Scripts: `scripts/head_evaluation/stage{0..10}_*.py` (+ `stage_*_commands.sh`)
