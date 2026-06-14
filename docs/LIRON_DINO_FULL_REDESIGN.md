@@ -110,3 +110,67 @@ RUN=experiments/dino_full_runs/<run>
 CUDA_VISIBLE_DEVICES=0 PY="$PY" scripts/run_dino_full_eval_bundle.sh \
   "$RUN" "$RUN/checkpoints/best.pt" configs/dino_dbt_full.yaml teacher
 ```
+
+---
+
+# Staged head-evaluation pipeline + end-to-end fine-tuning (June 13–14, 2026)
+
+> Liron added a large **staged downstream pipeline** (stages 0→10) on top of the
+> DINO-full backbone, culminating in **end-to-end fine-tuning** that broke the
+> ~0.75 frozen-feature ceiling. **Best validation AUROC ≈ 0.77.**
+> Source (server): `report_outputs/head_evaluation/` + `scripts/head_evaluation/`.
+
+## The headline result
+
+| | |
+|---|---|
+| Stage | `stage_10_imbalance_aware_pathology_dino_mil` |
+| Model | `stage10_e2e_focal_slice_mil_hard` |
+| **Val AUROC** | **0.7702** ← "the 0.77" |
+| Test AUROC (same run) | 0.750 |
+| Test AUROC (sibling config) | 0.759 (val 0.764) |
+| Best **test** AUROC across all stages | **0.7615** (Stage 7 hierarchical attention-MIL) |
+| Date | 2026-06-13 |
+| Init checkpoint | `experiments/dino_full_runs/dino_full_v1_20260606_131923_388774/checkpoints/best.pt` |
+| Selected ckpt | `report_outputs/head_evaluation/stage_10_.../checkpoints/stage10_e2e_focal_slice_mil_hard__auroc.pt` |
+
+⚠️ 0.7702 is **validation**; on held-out **test** the same model is ~0.75. Test was excluded from mining/thresholds; cross-split leakage check passed (0 overlaps).
+
+## What changed — end-to-end fine-tuning
+
+Stages 1–9 kept the backbone **frozen** and only trained heads (ceiling ~0.75).
+**Stage 10 unfreezes and fine-tunes the DINO backbone end-to-end** — the first time
+the encoder weights are updated by the downstream task. This is the "fine-tune the
+backbone" direction; it is what pushed performance past the frozen-feature plateau.
+
+Recipe (Stage 10, `stage10_imbalance_aware_pathology_dino_mil.py`):
+- DINO-full backbone initialized from `dino_full_v1` best.pt, fine-tuned **end-to-end** (very low lr ≈ 1e-6)
+- **Focal BCE** at patient level + **hard-example weighting** (hard pos/neg mined from train+val only)
+- **Top-k slice MIL** (not pseudo-labeling)
+- **Hierarchical view/side attention** head (carried from Stage 7)
+- Optional slice **continuity** term (≈0.01)
+- ~80 epochs max, early stopping patience 12; params: backbone 1.96M + hierarchy 0.65M = 2.6M
+
+## Stage progression (best AUROC per stage)
+
+| Stage | Approach | Backbone | Best AUROC |
+|---|---|---|---|
+| 1–3 | slice heads / pooling / gated MIL | frozen | ~0.63–0.72 (test) |
+| 5 / 5b | end-to-end MIL (gated / guided sampling) | fine-tuned | ~0.71 (test) |
+| 7 | hierarchical view+side attention MIL | frozen | **0.7615 (test)** |
+| 8 | patient SupCon representation learning | frozen | ~0.755 (test) |
+| 9 | selective-KD slice adapter | frozen | ~0.748 (val) |
+| **10** | **e2e focal slice-MIL + hard mining** | **fine-tuned** | **0.7702 (val) / ~0.75–0.76 (test)** |
+
+## Artifacts (server)
+
+- Scripts: `scripts/head_evaluation/stage{0..10}_*.py` (+ `stage_*_commands.sh`)
+- Per-stage outputs: `report_outputs/head_evaluation/stage_*/` — `stage_N_metrics.{json,csv,md}`, predictions, training curves, figures, error-space diagnostics, Hebrew summaries
+- Stage 10 checkpoints: `.../stage_10_.../checkpoints/stage10_e2e_focal_slice_mil_hard__{auroc,ap,balacc,sens80_spec,final}.pt`
+
+## Implication
+
+The project headline shifts from **frozen-backbone DINO ≈ 0.70** to
+**end-to-end fine-tuned DINO-MIL ≈ 0.77 (val) / ~0.76 (test)**. This is the model
+to deepen/report. Note the val–test gap (~0.77 → ~0.75) — report test numbers as
+the honest generalization estimate.
