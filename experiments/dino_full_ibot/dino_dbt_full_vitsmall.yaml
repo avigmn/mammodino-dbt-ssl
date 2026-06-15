@@ -1,0 +1,81 @@
+seed: 42
+
+data:
+  repo_root: ../dbt_simclr_project
+  data_config_path: configs/data.yaml
+
+dataset:
+  resize_height: 256          # base image size; crops are taken from this
+  resize_width: 256
+  normalize: true
+  use_processed_cache: false  # base size differs from legacy cache (224); recompute on the fly
+  stochastic_val_views: true  # multi-crop val (DINO uses stochastic crops everywhere)
+  # Multi-crop geometry (faithful DINO defaults)
+  local_size: 96
+  global_crops_scale_min: 0.4
+  global_crops_scale_max: 1.0
+  local_crops_scale_min: 0.05
+  local_crops_scale_max: 0.4
+  local_crops_number: 6
+  # Photometric (grayscale-appropriate; no grayscale-transform, no solarize)
+  color_jitter_p: 0.8
+  color_jitter_brightness: 0.4
+  color_jitter_contrast: 0.4
+  gaussian_blur_kernel: 23
+  solarize_p: 0.0
+  # Medical / tissue-aware (kept)
+  tissue_percentile: 80.0
+  tissue_mask_cleanup: true
+  tissue_crop_bias_prob: 0.6
+  tissue_crop_pad_frac: 0.08
+
+model:
+  arch: vit_small                  # 'tiny' (MammoDINO default) or 'vit_small' (ViT-S/16)
+  image_size: 224             # global-crop size fed to the backbone
+  patch_size: 16
+  # embed_dim/depth/num_heads default from the arch preset; override here if desired.
+  num_prototypes: 4096        # DINO uses 65536; smaller is fine for this dataset scale
+  head_hidden_dim: 2048
+  head_bottleneck_dim: 256
+  head_nlayers: 3
+  head_use_bn: false
+  norm_last_layer: true
+
+train:
+  epochs: 100
+  batch_size: 16
+  grad_accum_steps: 4
+  num_workers: 8
+  pin_memory: true
+  amp: true
+  # Optimizer + schedules
+  lr: 5.0e-4                  # peak LR after warmup (scale to batch size as needed)
+  min_lr: 1.0e-6
+  warmup_epochs: 10
+  weight_decay: 0.04
+  weight_decay_end: 0.4
+  # EMA teacher momentum (cosine -> 1.0)
+  momentum_teacher: 0.996
+  # Sharpening
+  student_temp: 0.1
+  teacher_temp: 0.04
+  warmup_teacher_temp: 0.04
+  warmup_teacher_temp_epochs: 30
+  center_momentum: 0.9
+  # Stability
+  clip_grad: 3.0
+  freeze_last_layer: 1
+  # Caps (0 = full)
+  max_train_steps: 0
+  max_val_steps: 0
+  save_every_epochs: 0
+  # Early stopping (matches legacy probe bundle: patience=5)
+  early_stopping:
+    enabled: true
+    patience: 5
+
+eval:
+  default_backbone: teacher   # student | teacher (DINO-standard default: teacher)
+
+output:
+  run_name: dino_dbt_full
